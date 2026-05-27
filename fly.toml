@@ -1,0 +1,45 @@
+app = "lighthouse-ldap"
+primary_region = "ams"
+
+[build]
+
+[vm]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+
+[env]
+  HTTP_PORT = "8080"
+  LDAP_PORT = "636"
+
+# HTTP health-check service
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+  [[services.http_checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/"
+
+# Raw TCP for LDAPS — app owns TLS, fly passes through
+[[services]]
+  internal_port = 636
+  protocol = "tcp"
+
+  [[services.ports]]
+    handlers = []
+    port = 636
+
+[metrics]
+  port = 8080
+  path = "/"
