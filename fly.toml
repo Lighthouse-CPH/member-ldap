@@ -10,7 +10,7 @@ primary_region = "ams"
 
 [env]
   HTTP_PORT = "8080"
-  LDAP_PORT = "636"
+  LDAP_PORT = "1636"
 
 # HTTP health-check service
 [http_service]
@@ -29,17 +29,14 @@ primary_region = "ams"
     method = "GET"
     path = "/"
 
-# LDAPS — fly terminates TLS, forwards plain LDAP to app
+# LDAPS — fly terminates TLS, forwards plain TCP to app on unprivileged port
 [[services]]
-  internal_port = 636
+  internal_port = 1636
   protocol = "tcp"
   min_machines_running = 0
   max_machines_running = 1
 
-  [[services.concurrency]]
-    type = "connections"
-    hard_limit = 25
-    soft_limit = 20
+  concurrency = { type = "connections", hard_limit = 25, soft_limit = 20 }
 
   [[services.ports]]
     handlers = ["tls"]

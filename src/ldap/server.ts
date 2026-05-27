@@ -40,7 +40,7 @@ export function startLdapServer(
   port: number,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    server.listen(port, () => {
+    server.listen(port, "0.0.0.0", () => {
       console.log(`[ldap] server listening on port ${port}`);
       resolve();
     });
