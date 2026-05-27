@@ -1,9 +1,9 @@
 import { assertEquals, assertNotEquals } from "@std/assert";
 import {
-  memberToLdapEntry,
-  memberDn,
-  parseSurname,
   filterEntries,
+  memberDn,
+  memberToLdapEntry,
+  parseSurname,
 } from "../../src/ldap/directory.ts";
 import { MEMBER_BASE_DN } from "../../src/ldap/types.ts";
 import type { MemberRecord } from "../../src/stripe/types.ts";
@@ -94,7 +94,12 @@ Deno.test("filterEntries - base scope matches only the exact DN", () => {
 
 Deno.test("filterEntries - filter by employeeType=active", () => {
   const entries: LdapEntry[] = [alice, bob].map(memberToLdapEntry);
-  const results = filterEntries(entries, MEMBER_BASE_DN, "sub", matchAttr("employeeType", "active"));
+  const results = filterEntries(
+    entries,
+    MEMBER_BASE_DN,
+    "sub",
+    matchAttr("employeeType", "active"),
+  );
   assertEquals(results.length, 1);
   assertEquals(results[0].attributes.uid, "cus_alice");
 });

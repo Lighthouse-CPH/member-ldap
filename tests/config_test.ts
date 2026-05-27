@@ -24,8 +24,6 @@ const baseEnv = {
   STRIPE_SECRET_KEY: "sk_test_xxx",
   LDAP_BIND_PASSWORD: "live-secret",
   LDAP_DEMO_PASSWORD: "demo-secret",
-  TLS_CERT_PEM: "CERT",
-  TLS_KEY_PEM: "KEY",
 };
 
 Deno.test("loadConfig - loads all required fields", () => {
@@ -34,8 +32,6 @@ Deno.test("loadConfig - loads all required fields", () => {
     assertEquals(config.stripeSecretKey, "sk_test_xxx");
     assertEquals(config.ldapBindPassword, "live-secret");
     assertEquals(config.ldapDemoPassword, "demo-secret");
-    assertEquals(config.tlsCertPem, "CERT");
-    assertEquals(config.tlsKeyPem, "KEY");
     assertEquals(config.cacheTtlMs, 300_000);
     assertEquals(config.ldapPort, 636);
     assertEquals(config.httpPort, 8080);
@@ -51,7 +47,12 @@ Deno.test("loadConfig - uses optional STRIPE_PRODUCT_ID when set", () => {
 });
 
 Deno.test("loadConfig - applies numeric overrides", () => {
-  withEnv({ ...baseEnv, CACHE_TTL_MS: "60000", LDAP_PORT: "1389", HTTP_PORT: "9090" }, () => {
+  withEnv({
+    ...baseEnv,
+    CACHE_TTL_MS: "60000",
+    LDAP_PORT: "1389",
+    HTTP_PORT: "9090",
+  }, () => {
     const config = loadConfig();
     assertEquals(config.cacheTtlMs, 60_000);
     assertEquals(config.ldapPort, 1389);

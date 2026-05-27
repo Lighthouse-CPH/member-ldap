@@ -2,7 +2,9 @@ import { assertEquals, assertRejects } from "@std/assert";
 import { subscriptionToMember } from "../../src/stripe/client.ts";
 import type Stripe from "stripe";
 
-function makeCustomer(overrides: Partial<Stripe.Customer> = {}): Stripe.Customer {
+function makeCustomer(
+  overrides: Partial<Stripe.Customer> = {},
+): Stripe.Customer {
   return {
     id: "cus_test123",
     object: "customer",

@@ -29,11 +29,11 @@ member DN: `uid=cus_xxx,ou=members,dc=lighthousecph,dc=dk`.
 - **Non-PII**: the ID is opaque and meaningless outside our Stripe account.
 - **No extra store**: no database or mapping table needed — Stripe is the source
   of truth and the ID is the key.
-- **Traceable**: easy to look up the full customer record in the Stripe dashboard
-  when investigating an issue.
+- **Traceable**: easy to look up the full customer record in the Stripe
+  dashboard when investigating an issue.
 
 ## Trade-offs
 
-- If a member's Stripe customer record is merged or replaced (rare Stripe edge case),
-  their LDAP identity changes. This is acceptable given the rarity and the fact that
-  the consuming service performs daily reconciliation.
+- If a member's Stripe customer record is merged or replaced (rare Stripe edge
+  case), their LDAP identity changes. This is acceptable given the rarity and
+  the fact that the consuming service performs daily reconciliation.

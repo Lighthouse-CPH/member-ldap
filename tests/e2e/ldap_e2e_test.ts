@@ -7,10 +7,17 @@
 import { assertEquals } from "@std/assert";
 import { Client } from "ldapts";
 import ldap from "ldapjs";
-import { createBindHandler, createSearchHandler } from "../../src/ldap/handlers.ts";
+import {
+  createBindHandler,
+  createSearchHandler,
+} from "../../src/ldap/handlers.ts";
 import type { MemberSource } from "../../src/ldap/handlers.ts";
 import type { MemberRecord } from "../../src/stripe/types.ts";
-import { LIVE_BIND_DN, DEMO_BIND_DN, MEMBER_BASE_DN } from "../../src/ldap/types.ts";
+import {
+  DEMO_BIND_DN,
+  LIVE_BIND_DN,
+  MEMBER_BASE_DN,
+} from "../../src/ldap/types.ts";
 
 const TEST_PORT = 13389; // Plain LDAP test port
 const LIVE_PASSWORD = "test-live-secret";
@@ -49,7 +56,11 @@ function createTestServer() {
     demoPassword: DEMO_PASSWORD,
   });
 
-  const searchHandler = createSearchHandler(liveSource, DEMO_BIND_DN, LIVE_BIND_DN);
+  const searchHandler = createSearchHandler(
+    liveSource,
+    DEMO_BIND_DN,
+    LIVE_BIND_DN,
+  );
 
   server.bind(LIVE_BIND_DN, bindHandler);
   server.bind(DEMO_BIND_DN, bindHandler);
@@ -170,7 +181,8 @@ Deno.test({
     const client = makeClient();
     await client.bind(LIVE_BIND_DN, LIVE_PASSWORD);
     const { searchEntries } = await client.search(MEMBER_BASE_DN, {
-      filter: "(&(objectClass=inetOrgPerson)(|(employeeType=active)(employeeType=grace_period)))",
+      filter:
+        "(&(objectClass=inetOrgPerson)(|(employeeType=active)(employeeType=grace_period)))",
       scope: "sub",
     });
     assertEquals(searchEntries.length, 2);

@@ -64,7 +64,9 @@ export function filterEntries(
       if (prefix.includes(",")) return false;
     } else if (scopeStr === "sub") {
       // Entry must be equal to or a descendant of reqDn
-      if (entryDn !== normalReqDn && !entryDn.endsWith(`,${normalReqDn}`)) return false;
+      if (entryDn !== normalReqDn && !entryDn.endsWith(`,${normalReqDn}`)) {
+        return false;
+      }
     } else {
       return false;
     }

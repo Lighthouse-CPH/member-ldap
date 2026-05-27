@@ -1,7 +1,7 @@
 import ldap from "ldapjs";
 import type { MemberSource } from "./handlers.ts";
 import { createBindHandler, createSearchHandler } from "./handlers.ts";
-import { LIVE_BIND_DN, DEMO_BIND_DN } from "./types.ts";
+import { DEMO_BIND_DN, LIVE_BIND_DN } from "./types.ts";
 
 interface LdapServerOptions {
   livePassword: string;
@@ -9,7 +9,9 @@ interface LdapServerOptions {
   memberSource: MemberSource;
 }
 
-export function createLdapServer(opts: LdapServerOptions): ReturnType<typeof ldap.createServer> {
+export function createLdapServer(
+  opts: LdapServerOptions,
+): ReturnType<typeof ldap.createServer> {
   // Always use plain TCP — TLS is terminated by the infrastructure layer (Fly.io passthrough).
   const server = ldap.createServer();
 
@@ -20,7 +22,11 @@ export function createLdapServer(opts: LdapServerOptions): ReturnType<typeof lda
     demoPassword: opts.demoPassword,
   });
 
-  const searchHandler = createSearchHandler(opts.memberSource, DEMO_BIND_DN, LIVE_BIND_DN);
+  const searchHandler = createSearchHandler(
+    opts.memberSource,
+    DEMO_BIND_DN,
+    LIVE_BIND_DN,
+  );
 
   server.bind(LIVE_BIND_DN, bindHandler);
   server.bind(DEMO_BIND_DN, bindHandler);

@@ -25,7 +25,9 @@ function intEnv(name: string, defaultValue: number): number {
   if (!raw) return defaultValue;
   const parsed = parseInt(raw, 10);
   if (isNaN(parsed)) {
-    throw new Error(`Environment variable ${name} must be an integer, got: ${raw}`);
+    throw new Error(
+      `Environment variable ${name} must be an integer, got: ${raw}`,
+    );
   }
   return parsed;
 }

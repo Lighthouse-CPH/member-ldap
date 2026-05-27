@@ -2,7 +2,7 @@
 import { timingSafeEqual } from "node:crypto";
 import ldap from "ldapjs";
 import type { MemberRecord } from "../stripe/types.ts";
-import { memberToLdapEntry, filterEntries } from "./directory.ts";
+import { filterEntries, memberToLdapEntry } from "./directory.ts";
 import { DEMO_MEMBERS } from "../demo/data.ts";
 
 export interface MemberSource {
@@ -72,7 +72,9 @@ export function createSearchHandler(
 
     // Reject anonymous (default DN is "cn=anonymous") and any unknown DNs
     const isDemo = boundDn === demoBindDn;
-    const isLive = liveBindDn ? boundDn === liveBindDn : (!isDemo && boundDn !== "cn=anonymous" && boundDn !== "");
+    const isLive = liveBindDn
+      ? boundDn === liveBindDn
+      : (!isDemo && boundDn !== "cn=anonymous" && boundDn !== "");
     if (!isDemo && !isLive) {
       return next(new ldap.InsufficientAccessRightsError());
     }
@@ -101,7 +103,10 @@ export function createSearchHandler(
       }
       res.end();
     } catch (err) {
-      console.error("[ldap] search error:", err instanceof Error ? err.message : err);
+      console.error(
+        "[ldap] search error:",
+        err instanceof Error ? err.message : err,
+      );
       return next(new ldap.OperationsError());
     }
   };
