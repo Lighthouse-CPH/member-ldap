@@ -8,7 +8,7 @@ async function main() {
   const config = loadConfig();
 
   const stripe = new Stripe(config.stripeSecretKey, {
-    apiVersion: "2025-04-30.basil",
+    apiVersion: "2025-02-24.acacia",
   });
 
   const memberSource = {
@@ -32,7 +32,7 @@ async function main() {
   // Graceful shutdown on SIGTERM (fly.io sends this before killing the process)
   Deno.addSignalListener("SIGTERM", () => {
     console.log("[main] SIGTERM received, shutting down...");
-    ldapServer.close();
+    ldapServer.close(() => {});
     httpServer.shutdown();
   });
 
