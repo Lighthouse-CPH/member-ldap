@@ -13,19 +13,16 @@ primary_region = "ams"
   LDAP_PORT = "636"
 
 # HTTP health-check service
-[[services]]
+[http_service]
   internal_port = 8080
-  protocol = "tcp"
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  max_machines_running = 1
+  concurrency = { type = "requests", hard_limit = 25, soft_limit = 20 }
 
-  [[services.ports]]
-    handlers = ["http"]
-    port = 80
-
-  [[services.ports]]
-    handlers = ["tls", "http"]
-    port = 443
-
-  [[services.http_checks]]
+  [[http_service.checks]]
     interval = "30s"
     timeout = "5s"
     grace_period = "10s"
@@ -36,6 +33,13 @@ primary_region = "ams"
 [[services]]
   internal_port = 636
   protocol = "tcp"
+  min_machines_running = 0
+  max_machines_running = 1
+
+  [[services.concurrency]]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
 
   [[services.ports]]
     handlers = ["tls"]
