@@ -1,4 +1,4 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import { assertEquals } from "@std/assert";
 import { subscriptionToMember } from "../../src/stripe/client.ts";
 import type Stripe from "stripe";
 

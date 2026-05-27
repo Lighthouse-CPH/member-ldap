@@ -35,7 +35,7 @@ export function createLdapServer(
   return server;
 }
 
-export async function startLdapServer(
+export function startLdapServer(
   server: ReturnType<typeof ldap.createServer>,
   port: number,
 ): Promise<void> {
