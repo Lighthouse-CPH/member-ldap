@@ -31,13 +31,13 @@ primary_region = "ams"
     method = "GET"
     path = "/"
 
-# Raw TCP for LDAPS — app owns TLS, fly passes through
+# LDAPS — fly terminates TLS, forwards plain LDAP to app
 [[services]]
   internal_port = 636
   protocol = "tcp"
 
   [[services.ports]]
-    handlers = []
+    handlers = ["tls"]
     port = 636
 
 [metrics]
