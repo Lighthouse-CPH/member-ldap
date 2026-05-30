@@ -1,84 +1,82 @@
 import { assertEquals } from "@std/assert";
-import { subscriptionToMember } from "../../src/stripe/client.ts";
+import { computeHasPaidRecently, computeSubStatus } from "../../src/stripe/client.ts";
 import type Stripe from "stripe";
 
-function makeCustomer(
-  overrides: Partial<Stripe.Customer> = {},
-): Stripe.Customer {
-  return {
-    id: "cus_test123",
-    object: "customer",
-    created: 1700000000,
-    livemode: false,
-    metadata: {},
-    email: "test@example.com",
-    name: "Jane Doe",
-    deleted: undefined,
-    ...overrides,
-  } as unknown as Stripe.Customer;
-}
+// ---------------------------------------------------------------------------
+// computeSubStatus
+// ---------------------------------------------------------------------------
 
-function makeSubscription(
+function makeSub(
   status: Stripe.Subscription.Status,
-  customer: Stripe.Customer,
+  pauseCollection: Stripe.Subscription["pause_collection"] = null,
 ): Stripe.Subscription {
   return {
-    id: "sub_test123",
+    id: "sub_test",
     object: "subscription",
     status,
-    customer,
-    created: 1700000000,
-    current_period_end: 1702000000,
-    current_period_start: 1700000000,
-    items: { object: "list", data: [], has_more: false, url: "" },
-    metadata: {},
-    livemode: false,
+    pause_collection: pauseCollection,
   } as unknown as Stripe.Subscription;
 }
 
-Deno.test("subscriptionToMember - active subscription", () => {
-  const customer = makeCustomer();
-  const sub = makeSubscription("active", customer);
-  const record = subscriptionToMember(sub, customer);
-  assertEquals(record?.status, "active");
-  assertEquals(record?.customerId, "cus_test123");
-  assertEquals(record?.email, "test@example.com");
-  assertEquals(record?.displayName, "Jane Doe");
-  assertEquals(record?.surname, "Doe");
+Deno.test("computeSubStatus - active subscription (no pause)", () => {
+  assertEquals(computeSubStatus(makeSub("active")), "active");
 });
 
-Deno.test("subscriptionToMember - past_due subscription maps to grace_period", () => {
-  const customer = makeCustomer();
-  const sub = makeSubscription("past_due", customer);
-  const record = subscriptionToMember(sub, customer);
-  assertEquals(record?.status, "grace_period");
+Deno.test("computeSubStatus - active subscription with pause_collection is paused", () => {
+  // Stripe keeps status="active" when collection is paused; we surface it as "paused".
+  const paused = makeSub("active", {
+    behavior: "keep_as_draft",
+    resumes_at: null,
+  });
+  assertEquals(computeSubStatus(paused), "paused");
 });
 
-Deno.test("subscriptionToMember - canceled subscription returns undefined", () => {
-  const customer = makeCustomer();
-  const sub = makeSubscription("canceled", customer);
-  const record = subscriptionToMember(sub, customer);
-  assertEquals(record, undefined);
+Deno.test("computeSubStatus - past_due subscription", () => {
+  assertEquals(computeSubStatus(makeSub("past_due")), "past_due");
 });
 
-Deno.test("subscriptionToMember - single name falls back surname to 'Member'", () => {
-  const customer = makeCustomer({ name: "Madonna" });
-  const sub = makeSubscription("active", customer);
-  const record = subscriptionToMember(sub, customer);
-  assertEquals(record?.surname, "Member");
+// ---------------------------------------------------------------------------
+// computeHasPaidRecently
+// ---------------------------------------------------------------------------
+
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const THREE_WEEKS_MS = 21 * 24 * 60 * 60 * 1000;
+
+function makeInvoice(
+  status: Stripe.Invoice.Status,
+  createdMs: number,
+  now: number,
+): Stripe.Invoice {
+  // `created` is a Unix timestamp in seconds
+  return {
+    status,
+    created: Math.floor((now - createdMs) / 1000),
+  } as unknown as Stripe.Invoice;
+}
+
+Deno.test("computeHasPaidRecently - paid invoice → true", () => {
+  const now = Date.now();
+  const invoice = makeInvoice("paid", THREE_WEEKS_MS, now); // old but paid
+  assertEquals(computeHasPaidRecently(invoice, now), true);
 });
 
-Deno.test("subscriptionToMember - no name falls back to email", () => {
-  const customer = makeCustomer({ name: null });
-  const sub = makeSubscription("active", customer);
-  const record = subscriptionToMember(sub, customer);
-  assertEquals(record?.displayName, "test@example.com");
+Deno.test("computeHasPaidRecently - unpaid invoice within 2 weeks → true (grace period)", () => {
+  const now = Date.now();
+  const invoice = makeInvoice("open", ONE_WEEK_MS, now); // 1 week old, unpaid
+  assertEquals(computeHasPaidRecently(invoice, now), true);
 });
 
-Deno.test("subscriptionToMember - no name or email falls back to customer id", () => {
-  const customer = makeCustomer({ name: null, email: null });
-  const sub = makeSubscription("active", customer);
-  const record = subscriptionToMember(sub, customer);
-  assertEquals(record?.displayName, "cus_test123");
-  assertEquals(record?.email, "");
+Deno.test("computeHasPaidRecently - unpaid invoice older than 2 weeks → false", () => {
+  const now = Date.now();
+  const invoice = makeInvoice("open", THREE_WEEKS_MS, now); // 3 weeks old, unpaid
+  assertEquals(computeHasPaidRecently(invoice, now), false);
+});
+
+Deno.test("computeHasPaidRecently - null invoice → false (no payment data)", () => {
+  assertEquals(computeHasPaidRecently(null), false);
+});
+
+Deno.test("computeHasPaidRecently - string invoice ID (not expanded) → false", () => {
+  // Should not happen in practice, but defensively handled.
+  assertEquals(computeHasPaidRecently("in_notexpanded"), false);
 });

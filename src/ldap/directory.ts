@@ -1,27 +1,31 @@
-import type { MemberRecord } from "../stripe/types.ts";
 import { MEMBER_BASE_DN } from "./types.ts";
-import type { LdapEntry } from "./types.ts";
+import type { LdapEntry, LdapMemberRecord } from "./types.ts";
 
-export function memberDn(customerId: string): string {
-  return `uid=${customerId},${MEMBER_BASE_DN}`;
+/**
+ * Constructs the LDAP Distinguished Name for a member entry.
+ * The uid component is the hashed customer ID (see src/mapper.ts hashCustomerId),
+ * not the raw Stripe customer ID.
+ */
+export function memberDn(uid: string): string {
+  return `uid=${uid},${MEMBER_BASE_DN}`;
 }
 
-export function parseSurname(displayName: string): string {
-  const parts = displayName.trim().split(/\s+/);
-  if (parts.length <= 1) return "Member";
-  return parts[parts.length - 1];
-}
-
-export function memberToLdapEntry(member: MemberRecord): LdapEntry {
+/**
+ * Converts an LdapMemberRecord into a wire-ready LdapEntry for ldapjs.
+ * At this point all business logic (hashing, status mapping, filtering) has
+ * already been applied by the mapper; this function is a pure structural
+ * transformation into the LDAP attribute schema.
+ */
+export function memberToLdapEntry(member: LdapMemberRecord): LdapEntry {
   return {
-    dn: memberDn(member.customerId),
+    dn: memberDn(member.uid),
     attributes: {
       objectClass: ["inetOrgPerson", "organizationalPerson", "person", "top"],
-      uid: member.customerId,
+      uid: member.uid,
       mail: member.email,
       cn: member.displayName,
       sn: member.surname,
-      employeeType: member.status,
+      employeeType: member.employeeType,
     },
   };
 }

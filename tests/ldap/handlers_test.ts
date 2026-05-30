@@ -5,12 +5,16 @@ import {
   createSearchHandler,
 } from "../../src/ldap/handlers.ts";
 import type { MemberSource } from "../../src/ldap/handlers.ts";
-import type { MemberRecord } from "../../src/stripe/types.ts";
+import type { LdapMemberRecord } from "../../src/ldap/types.ts";
 import {
   DEMO_BIND_DN,
   LIVE_BIND_DN,
   MEMBER_BASE_DN,
 } from "../../src/ldap/types.ts";
+import { DEMO_MEMBERS } from "../../src/demo/data.ts";
+import { stripeMemberToLdap } from "../../src/mapper.ts";
+
+const TEST_UID_HASH_SEED = "test-seed";
 
 // Minimal mock request / response builder
 function makeBind(dn: string, password: string) {
@@ -107,22 +111,32 @@ Deno.test("bindHandler - rejects unknown DN", () => {
   assertInstanceOf(getNextError(), ldap.InvalidCredentialsError);
 });
 
-const liveMembers: Map<string, MemberRecord> = new Map([
-  ["cus_live1", {
-    customerId: "cus_live1",
-    email: "live@example.dk",
-    displayName: "Live Person",
-    surname: "Person",
-    status: "active",
-  }],
-]);
+const liveMember: LdapMemberRecord = {
+  uid: "hashed-uid-live1",
+  email: "live@example.dk",
+  displayName: "Live Person",
+  surname: "Person",
+  employeeType: "active",
+};
 
-const liveSource: MemberSource = {
-  getMembers: () => Promise.resolve(liveMembers),
+const liveMemberSource: MemberSource = {
+  getMembers: () => Promise.resolve(new Map([["hashed-uid-live1", liveMember]])),
+};
+
+const demoMemberSource: MemberSource = {
+  getMembers: () => {
+    const mapped = new Map<string, LdapMemberRecord>();
+    for (const record of DEMO_MEMBERS) {
+      const ldapRecord = stripeMemberToLdap(record, TEST_UID_HASH_SEED);
+      if (ldapRecord) mapped.set(ldapRecord.uid, ldapRecord);
+    }
+    return Promise.resolve(mapped);
+  },
 };
 
 const searchHandler = createSearchHandler(
-  liveSource,
+  liveMemberSource,
+  demoMemberSource,
   DEMO_BIND_DN,
   LIVE_BIND_DN,
 );
@@ -142,7 +156,7 @@ Deno.test("searchHandler - live-reader returns live members", async () => {
   assertEquals(sent.length, 1);
   assertEquals(
     (sent[0] as { attributes: { uid: string } }).attributes.uid,
-    "cus_live1",
+    "hashed-uid-live1",
   );
 });
 

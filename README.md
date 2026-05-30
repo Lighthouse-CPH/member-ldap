@@ -60,14 +60,41 @@ curl http://localhost:8080/
 # 4. Query live members (requires openldap tools: brew install openldap)
 ldapsearch -H ldap://localhost:636 -x \
   -D "cn=live-reader,ou=services,dc=lighthousecph,dc=dk" \
-  -w "$LDAP_BIND_PASSWORD" \
+  -w "changeme-live-password \
   -b "ou=members,dc=lighthousecph,dc=dk" \
   "(objectClass=inetOrgPerson)"
 
 # 5. Query demo members
 ldapsearch -H ldap://localhost:636 -x \
   -D "cn=demo-reader,ou=services,dc=lighthousecph,dc=dk" \
-  -w "$LDAP_DEMO_PASSWORD" \
+  -w "changeme-demo-password" \
+  -b "ou=members,dc=lighthousecph,dc=dk" \
+  "(objectClass=inetOrgPerson)"
+```
+
+## Testing the deployed server
+
+macOS's built-in `ldapsearch` cannot connect due to TLS restrictions. Install the
+Homebrew version first:
+
+```bash
+brew install openldap
+```
+
+Then query the deployed server directly:
+
+```bash
+# Demo members (no Stripe needed)
+$(brew --prefix)/opt/openldap/bin/ldapsearch -H ldaps://ldap.lighthousecph.dk:636 \
+  -D "cn=demo-reader,ou=services,dc=lighthousecph,dc=dk" \
+  -w "your-demo-password" \
+  -b "ou=members,dc=lighthousecph,dc=dk" \
+  "(objectClass=inetOrgPerson)"
+
+# Live members
+$(brew --prefix)/bin/ldapsearch -H ldaps://ldap.lighthousecph.dk:636 \
+  -D "cn=live-reader,ou=services,dc=lighthousecph,dc=dk" \
+  -w "your-live-password" \
   -b "ou=members,dc=lighthousecph,dc=dk" \
   "(objectClass=inetOrgPerson)"
 ```

@@ -6,7 +6,10 @@ import { DEMO_BIND_DN, LIVE_BIND_DN } from "./types.ts";
 interface LdapServerOptions {
   livePassword: string;
   demoPassword: string;
-  memberSource: MemberSource;
+  /** Source for live member data (fetched from Stripe, pre-mapped). */
+  liveMemberSource: MemberSource;
+  /** Source for demo member data (fake fixtures, pre-mapped). */
+  demoMemberSource: MemberSource;
 }
 
 export function createLdapServer(
@@ -23,7 +26,8 @@ export function createLdapServer(
   });
 
   const searchHandler = createSearchHandler(
-    opts.memberSource,
+    opts.liveMemberSource,
+    opts.demoMemberSource,
     DEMO_BIND_DN,
     LIVE_BIND_DN,
   );

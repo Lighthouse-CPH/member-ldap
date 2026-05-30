@@ -3,49 +3,36 @@ import {
   filterEntries,
   memberDn,
   memberToLdapEntry,
-  parseSurname,
 } from "../../src/ldap/directory.ts";
 import { MEMBER_BASE_DN } from "../../src/ldap/types.ts";
-import type { MemberRecord } from "../../src/stripe/types.ts";
-import type { LdapEntry } from "../../src/ldap/types.ts";
+import type { LdapEntry, LdapMemberRecord } from "../../src/ldap/types.ts";
 
-const alice: MemberRecord = {
-  customerId: "cus_alice",
+// Fixtures use pre-hashed UIDs — in production these come from hashCustomerId(),
+// but the directory layer is agnostic to how UIDs are produced.
+const alice: LdapMemberRecord = {
+  uid: "hashed-uid-alice",
   email: "alice@example.dk",
   displayName: "Alice Andersen",
   surname: "Andersen",
-  status: "active",
+  employeeType: "active",
 };
 
-const bob: MemberRecord = {
-  customerId: "cus_bob",
+const bob: LdapMemberRecord = {
+  uid: "hashed-uid-bob",
   email: "bob@example.dk",
   displayName: "Bob",
   surname: "Member",
-  status: "grace_period",
+  employeeType: "inactive",
 };
 
 Deno.test("memberDn - formats DN correctly", () => {
-  assertEquals(memberDn("cus_abc"), `uid=cus_abc,${MEMBER_BASE_DN}`);
-});
-
-Deno.test("parseSurname - extracts last word from multi-word name", () => {
-  assertEquals(parseSurname("Alice Andersen"), "Andersen");
-  assertEquals(parseSurname("Alice Marie Andersen"), "Andersen");
-});
-
-Deno.test("parseSurname - single name returns 'Member'", () => {
-  assertEquals(parseSurname("Madonna"), "Member");
-});
-
-Deno.test("parseSurname - empty string returns 'Member'", () => {
-  assertEquals(parseSurname(""), "Member");
+  assertEquals(memberDn("hashed-uid-abc"), `uid=hashed-uid-abc,${MEMBER_BASE_DN}`);
 });
 
 Deno.test("memberToLdapEntry - active member shape", () => {
   const entry = memberToLdapEntry(alice);
-  assertEquals(entry.dn, `uid=cus_alice,${MEMBER_BASE_DN}`);
-  assertEquals(entry.attributes.uid, "cus_alice");
+  assertEquals(entry.dn, `uid=hashed-uid-alice,${MEMBER_BASE_DN}`);
+  assertEquals(entry.attributes.uid, "hashed-uid-alice");
   assertEquals(entry.attributes.mail, "alice@example.dk");
   assertEquals(entry.attributes.cn, "Alice Andersen");
   assertEquals(entry.attributes.sn, "Andersen");
@@ -58,9 +45,9 @@ Deno.test("memberToLdapEntry - active member shape", () => {
   ]);
 });
 
-Deno.test("memberToLdapEntry - grace_period member has correct employeeType", () => {
+Deno.test("memberToLdapEntry - inactive member has correct employeeType", () => {
   const entry = memberToLdapEntry(bob);
-  assertEquals(entry.attributes.employeeType, "grace_period");
+  assertEquals(entry.attributes.employeeType, "inactive");
 });
 
 // Helper: simple always-match filter
@@ -86,10 +73,10 @@ Deno.test("filterEntries - one scope matches direct children", () => {
 
 Deno.test("filterEntries - base scope matches only the exact DN", () => {
   const entries: LdapEntry[] = [alice, bob].map(memberToLdapEntry);
-  const aliceDn = memberDn("cus_alice");
+  const aliceDn = memberDn("hashed-uid-alice");
   const results = filterEntries(entries, aliceDn, "base", matchAll);
   assertEquals(results.length, 1);
-  assertEquals(results[0].attributes.uid, "cus_alice");
+  assertEquals(results[0].attributes.uid, "hashed-uid-alice");
 });
 
 Deno.test("filterEntries - filter by employeeType=active", () => {
@@ -101,7 +88,7 @@ Deno.test("filterEntries - filter by employeeType=active", () => {
     matchAttr("employeeType", "active"),
   );
   assertEquals(results.length, 1);
-  assertEquals(results[0].attributes.uid, "cus_alice");
+  assertEquals(results[0].attributes.uid, "hashed-uid-alice");
 });
 
 Deno.test("filterEntries - matchNone returns empty array", () => {

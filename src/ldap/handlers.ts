@@ -1,12 +1,16 @@
 // deno-lint-ignore-file no-explicit-any
 import { timingSafeEqual } from "node:crypto";
 import ldap from "ldapjs";
-import type { MemberRecord } from "../stripe/types.ts";
+import type { LdapMemberRecord } from "./types.ts";
 import { filterEntries, memberToLdapEntry } from "./directory.ts";
-import { DEMO_MEMBERS } from "../demo/data.ts";
 
+/**
+ * Abstraction over the member data source. The handler does not care whether
+ * records came from Stripe or from demo fixtures — both paths produce the same
+ * LdapMemberRecord shape after passing through the mapper.
+ */
 export interface MemberSource {
-  getMembers(): Promise<Map<string, MemberRecord>>;
+  getMembers(): Promise<Map<string, LdapMemberRecord>>;
 }
 
 interface BindCredentials {
@@ -16,12 +20,16 @@ interface BindCredentials {
   demoPassword: string;
 }
 
+/**
+ * Timing-safe string comparison that avoids early-exit on length mismatch.
+ * Without this, an attacker could enumerate valid DN lengths via response timing.
+ */
 function timingSafeStringEqual(a: string, b: string): boolean {
   const encoder = new TextEncoder();
   const bufA = encoder.encode(a);
   const bufB = encoder.encode(b);
   if (bufA.length !== bufB.length) {
-    // Compare against a dummy buffer of same length to avoid timing leak
+    // Compare against a dummy buffer of the same length to avoid timing leak
     const dummy = new Uint8Array(bufA.length);
     timingSafeEqual(bufA, dummy);
     return false;
@@ -33,6 +41,9 @@ function timingSafeStringEqual(a: string, b: string): boolean {
  * Creates the LDAP bind handler.
  * Accepts live-reader and demo-reader service accounts only.
  * Uses timing-safe password comparison.
+ *
+ * IMPORTANT: must call next() after res.end() so ldapjs commits the bindDN
+ * on the connection. Without next(), subsequent requests see cn=anonymous.
  */
 export function createBindHandler(creds: BindCredentials): any {
   return (req: any, res: any, next: any) => {
@@ -58,19 +69,26 @@ export function createBindHandler(creds: BindCredentials): any {
 
 /**
  * Creates the LDAP search handler.
- * - demo-reader: returns fake DEMO_MEMBERS (no Stripe call)
- * - live-reader: fetches live members from Stripe via MemberSource
- * - unauthenticated: returns InsufficientAccessRightsError
+ *
+ * Two separate MemberSources allow the handler to serve different data sets
+ * depending on which service account is bound — without embedding any mapping
+ * or filtering logic here. Both sources already return LdapMemberRecord maps,
+ * so the handler only needs to convert them to wire entries and filter by scope.
+ *
+ * - demo-reader → demoSource (fake members; no Stripe call)
+ * - live-reader → liveSource (real members from Stripe, pre-mapped)
+ * - unauthenticated / unknown DN → InsufficientAccessRightsError
  */
 export function createSearchHandler(
-  source: MemberSource,
+  liveSource: MemberSource,
+  demoSource: MemberSource,
   demoBindDn: string,
   liveBindDn?: string,
 ): any {
   return async (req: any, res: any, next: any) => {
     const boundDn: string = req.connection?.ldap?.bindDN?.toString() ?? "";
 
-    // Reject anonymous (default DN is "cn=anonymous") and any unknown DNs
+    // Reject anonymous (default DN is "cn=anonymous") and any unknown DNs.
     const isDemo = boundDn === demoBindDn;
     const isLive = liveBindDn
       ? boundDn === liveBindDn
@@ -80,13 +98,7 @@ export function createSearchHandler(
     }
 
     try {
-      let members: Map<string, MemberRecord>;
-
-      if (isDemo) {
-        members = new Map(DEMO_MEMBERS.map((m) => [m.customerId, m]));
-      } else {
-        members = await source.getMembers();
-      }
+      const members = await (isDemo ? demoSource : liveSource).getMembers();
 
       const entries = Array.from(members.values()).map(memberToLdapEntry);
       const reqDn = req.dn.toString();

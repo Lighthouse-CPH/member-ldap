@@ -6,6 +6,12 @@ export interface Config {
   ldapDemoPassword: string;
   ldapPort: number;
   httpPort: number;
+  /**
+   * HMAC key used when hashing Stripe customer IDs into LDAP UIDs.
+   * Rotating this seed invalidates all existing UIDs — do so only intentionally,
+   * as Mio will treat every member as a new entry.
+   */
+  uidHashSeed: string;
 }
 
 function requireEnv(name: string): string {
@@ -41,5 +47,6 @@ export function loadConfig(): Config {
     ldapDemoPassword: requireEnv("LDAP_DEMO_PASSWORD"),
     ldapPort: intEnv("LDAP_PORT", 636),
     httpPort: intEnv("HTTP_PORT", 8080),
+    uidHashSeed: requireEnv("UID_HASH_SEED"),
   };
 }

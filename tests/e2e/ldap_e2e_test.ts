@@ -12,37 +12,53 @@ import {
   createSearchHandler,
 } from "../../src/ldap/handlers.ts";
 import type { MemberSource } from "../../src/ldap/handlers.ts";
-import type { MemberRecord } from "../../src/stripe/types.ts";
+import type { LdapMemberRecord } from "../../src/ldap/types.ts";
 import {
   DEMO_BIND_DN,
   LIVE_BIND_DN,
   MEMBER_BASE_DN,
 } from "../../src/ldap/types.ts";
+import { DEMO_MEMBERS } from "../../src/demo/data.ts";
+import { hashCustomerId, stripeMemberToLdap } from "../../src/mapper.ts";
 
 const TEST_PORT = 13389; // Plain LDAP test port
 const LIVE_PASSWORD = "test-live-secret";
 const DEMO_PASSWORD = "test-demo-secret";
+const TEST_UID_HASH_SEED = "test-e2e-seed";
 
-const liveMembers: Map<string, MemberRecord> = new Map([
-  ["cus_e2e001", {
+function buildSource(
+  stripeRecords: Parameters<typeof stripeMemberToLdap>[0][],
+): MemberSource {
+  return {
+    getMembers: () => {
+      const mapped = new Map<string, LdapMemberRecord>();
+      for (const record of stripeRecords) {
+        const ldapRecord = stripeMemberToLdap(record, TEST_UID_HASH_SEED);
+        if (ldapRecord) mapped.set(ldapRecord.uid, ldapRecord);
+      }
+      return Promise.resolve(mapped);
+    },
+  };
+}
+
+const liveMemberSource = buildSource([
+  {
     customerId: "cus_e2e001",
     email: "e2e@example.dk",
     displayName: "E2E Testperson",
-    surname: "Testperson",
     status: "active",
-  }],
-  ["cus_e2e002", {
+    hasPaidRecently: true,
+  },
+  {
     customerId: "cus_e2e002",
     email: "grace@example.dk",
     displayName: "Grace Period",
-    surname: "Period",
-    status: "grace_period",
-  }],
+    status: "past_due",
+    hasPaidRecently: false,
+  },
 ]);
 
-const liveSource: MemberSource = {
-  getMembers: () => Promise.resolve(liveMembers),
-};
+const demoMemberSource = buildSource(DEMO_MEMBERS);
 
 /** Creates a plain (non-TLS) ldapjs server wired with real handlers. */
 function createTestServer() {
@@ -57,7 +73,8 @@ function createTestServer() {
   });
 
   const searchHandler = createSearchHandler(
-    liveSource,
+    liveMemberSource,
+    demoMemberSource,
     DEMO_BIND_DN,
     LIVE_BIND_DN,
   );
@@ -151,7 +168,11 @@ Deno.test({
     });
     assertEquals(searchEntries.length, 2);
     const uids = searchEntries.map((e) => e.uid as string).sort();
-    assertEquals(uids, ["cus_e2e001", "cus_e2e002"]);
+    const expectedUids = [
+      hashCustomerId("cus_e2e001", TEST_UID_HASH_SEED),
+      hashCustomerId("cus_e2e002", TEST_UID_HASH_SEED),
+    ].sort();
+    assertEquals(uids, expectedUids);
     await client.unbind();
   },
   sanitizeResources: false,
@@ -168,7 +189,10 @@ Deno.test({
       scope: "sub",
     });
     assertEquals(searchEntries.length, 1);
-    assertEquals(searchEntries[0].uid as string, "cus_e2e001");
+    assertEquals(
+      searchEntries[0].uid as string,
+      hashCustomerId("cus_e2e001", TEST_UID_HASH_SEED),
+    );
     await client.unbind();
   },
   sanitizeResources: false,
@@ -176,13 +200,13 @@ Deno.test({
 });
 
 Deno.test({
-  name: "e2e - live-reader filter for active OR grace_period",
+  name: "e2e - live-reader filter for active OR inactive",
   async fn() {
     const client = makeClient();
     await client.bind(LIVE_BIND_DN, LIVE_PASSWORD);
     const { searchEntries } = await client.search(MEMBER_BASE_DN, {
       filter:
-        "(&(objectClass=inetOrgPerson)(|(employeeType=active)(employeeType=grace_period)))",
+        "(&(objectClass=inetOrgPerson)(|(employeeType=active)(employeeType=inactive)))",
       scope: "sub",
     });
     assertEquals(searchEntries.length, 2);

@@ -24,6 +24,7 @@ const baseEnv = {
   STRIPE_SECRET_KEY: "sk_test_xxx",
   LDAP_BIND_PASSWORD: "live-secret",
   LDAP_DEMO_PASSWORD: "demo-secret",
+  UID_HASH_SEED: "test-seed",
 };
 
 Deno.test("loadConfig - loads all required fields", () => {
@@ -36,6 +37,7 @@ Deno.test("loadConfig - loads all required fields", () => {
     assertEquals(config.ldapPort, 636);
     assertEquals(config.httpPort, 8080);
     assertEquals(config.stripeProductId, undefined);
+    assertEquals(config.uidHashSeed, "test-seed");
   });
 });
 
