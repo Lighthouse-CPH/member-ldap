@@ -10,17 +10,9 @@ those subscriptions and presents them as an LDAP directory so that external
 services can query who is currently an active member — without needing direct
 access to Stripe.
 
-Two service accounts are available:
-
-| Account       | DN                                                  | Data                                    |
-| ------------- | --------------------------------------------------- | --------------------------------------- |
-| `live-reader` | `cn=live-reader,ou=services,dc=lighthousecph,dc=dk` | Live members from Stripe                |
-| `demo-reader` | `cn=demo-reader,ou=services,dc=lighthousecph,dc=dk` | 8 fake members for testing integrations |
-
 Members are stored under `ou=members,dc=lighthousecph,dc=dk` as `inetOrgPerson`
-entries, identified by their Stripe customer ID (`uid`). The `employeeType`
-attribute indicates membership status: `active` or `grace_period` (past-due
-subscriptions).
+entries. The `employeeType` attribute indicates membership status: `active` or
+`inactive`.
 
 ## How it works
 
@@ -60,7 +52,7 @@ curl http://localhost:8080/
 # 4. Query live members (requires openldap tools: brew install openldap)
 ldapsearch -H ldap://localhost:636 -x \
   -D "cn=live-reader,ou=services,dc=lighthousecph,dc=dk" \
-  -w "changeme-live-password \
+  -w "changeme-live-password" \
   -b "ou=members,dc=lighthousecph,dc=dk" \
   "(objectClass=inetOrgPerson)"
 
@@ -68,33 +60,6 @@ ldapsearch -H ldap://localhost:636 -x \
 ldapsearch -H ldap://localhost:636 -x \
   -D "cn=demo-reader,ou=services,dc=lighthousecph,dc=dk" \
   -w "changeme-demo-password" \
-  -b "ou=members,dc=lighthousecph,dc=dk" \
-  "(objectClass=inetOrgPerson)"
-```
-
-## Testing the deployed server
-
-macOS's built-in `ldapsearch` cannot connect due to TLS restrictions. Install the
-Homebrew version first:
-
-```bash
-brew install openldap
-```
-
-Then query the deployed server directly:
-
-```bash
-# Demo members (no Stripe needed)
-$(brew --prefix)/opt/openldap/bin/ldapsearch -H ldaps://ldap.lighthousecph.dk:636 \
-  -D "cn=demo-reader,ou=services,dc=lighthousecph,dc=dk" \
-  -w "your-demo-password" \
-  -b "ou=members,dc=lighthousecph,dc=dk" \
-  "(objectClass=inetOrgPerson)"
-
-# Live members
-$(brew --prefix)/bin/ldapsearch -H ldaps://ldap.lighthousecph.dk:636 \
-  -D "cn=live-reader,ou=services,dc=lighthousecph,dc=dk" \
-  -w "your-live-password" \
   -b "ou=members,dc=lighthousecph,dc=dk" \
   "(objectClass=inetOrgPerson)"
 ```
@@ -121,6 +86,73 @@ fly certs create ldap.lighthousecph.dk
 
 Then point `ldap.lighthousecph.dk` A/AAAA records at the allocated IPs. Fly will
 auto-provision and renew a Let's Encrypt cert.
+
+## API Consumer Integration
+
+**Endpoint:** `ldaps://ldap.lighthousecph.dk:636`
+
+**Credentials** are shared via secure channel. Two accounts are available:
+
+| Account | DN | Data |
+|---|---|---|
+| `live-reader` | `cn=live-reader,ou=services,dc=lighthousecph,dc=dk` | Live members |
+| `demo-reader` | `cn=demo-reader,ou=services,dc=lighthousecph,dc=dk` | Fake members for testing |
+
+### Get all active members
+
+```sh
+# Live
+ldapsearch -H ldaps://ldap.lighthousecph.dk:636 \
+  -D "cn=live-reader,ou=services,dc=lighthousecph,dc=dk" \
+  -w "<password>" \
+  -b "ou=members,dc=lighthousecph,dc=dk" \
+  "(employeeType=active)"
+
+# Demo
+ldapsearch -H ldaps://ldap.lighthousecph.dk:636 \
+  -D "cn=demo-reader,ou=services,dc=lighthousecph,dc=dk" \
+  -w "<password>" \
+  -b "ou=members,dc=lighthousecph,dc=dk" \
+  "(employeeType=active)"
+```
+
+### Check if an email belongs to an active member
+
+```sh
+# Live
+ldapsearch -H ldaps://ldap.lighthousecph.dk:636 \
+  -D "cn=live-reader,ou=services,dc=lighthousecph,dc=dk" \
+  -w "<password>" \
+  -b "ou=members,dc=lighthousecph,dc=dk" \
+  "(&(mail=user@example.com)(employeeType=active))"
+
+# Demo
+ldapsearch -H ldaps://ldap.lighthousecph.dk:636 \
+  -D "cn=demo-reader,ou=services,dc=lighthousecph,dc=dk" \
+  -w "<password>" \
+  -b "ou=members,dc=lighthousecph,dc=dk" \
+  "(&(mail=user@example.com)(employeeType=active))"
+```
+
+### Look up a member by stable ID
+
+Each entry has a `uid` attribute that is stable even if the member's email changes. Use it as your internal identifier.
+
+```sh
+# Live
+ldapsearch -H ldaps://ldap.lighthousecph.dk:636 \
+  -D "cn=live-reader,ou=services,dc=lighthousecph,dc=dk" \
+  -w "<password>" \
+  -b "ou=members,dc=lighthousecph,dc=dk" \
+  "(uid=<stable-id>)"
+
+# Demo
+ldapsearch -H ldaps://ldap.lighthousecph.dk:636 \
+  -D "cn=demo-reader,ou=services,dc=lighthousecph,dc=dk" \
+  -w "<password>" \
+  -b "ou=members,dc=lighthousecph,dc=dk" \
+  "(uid=<stable-id>)"
+```
 
 ## Contributing
 
